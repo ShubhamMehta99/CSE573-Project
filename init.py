@@ -85,7 +85,7 @@ def tweepy_save_text_from_id():
         json_api_response = json.load(f)
 
         # output file 'text_id_dataset.csv' with texts and tweet ID:
-        with open('dataset/text_id_dataset.csv','w', encoding='utf-8') as opfile:
+        with open('dataset/text_id_dataset.csv','a', encoding='utf-8') as opfile:
             writer = csv.writer(opfile)
             for tweet in json_api_response['results']:
                 try:
