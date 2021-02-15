@@ -96,10 +96,10 @@ def computeModularity(tweet_graph):
     graph_communities = list(greedy_modularity_communities(networkx_tweet_graph))
     return graph_communities
 
-def computeAgglimerativeClustering(tweet_graph, n_clusters=2):
+def computeAgglomerativeClustering(tweet_graph, n_clusters=2):
     '''
     This function takes the tweet_gragh as an input and computes 
-    number of communities in the graph using the Clauset-Newman-Moore greedy modularity maximization.
+    number of clusters in the graph using agglomerative clustering.
     
     Arguments: 
         tweet_graph: the tweet graph built in buildGraph()
@@ -119,9 +119,33 @@ def computeAgglimerativeClustering(tweet_graph, n_clusters=2):
     graph_agglomerative_clustering = AgglomerativeClustering(n_clusters=n_clusters).fit(tweet_graph_np)
     return graph_agglomerative_clustering
 
+def computeDbscanClustering(tweet_graph, eps=10):
+    '''
+    This function takes the tweet_gragh as an input and computes 
+    number of clusters in the graph using the DBSCAN algorithm.
+    
+    Arguments: 
+        tweet_graph: the tweet graph built in buildGraph()
+        eps: Max distance between two nodes
+
+    Returns: DBSCAN clustering
+
+    Example: 
+    >>> computeDbscanClustering(tweet_graph, eps=6)
+    '''
+
+    tweet_graph_2d = []
+    for v1 in tweet_graph:
+        for v2 in tweet_graph[v1]:
+            tweet_graph_2d.append([v1, v2])
+    tweet_graph_np = np.array(tweet_graph_2d)
+    graph_dbscan_clustering = DBSCAN(eps=10).fit(tweet_graph_np)
+    return graph_dbscan_clustering
+
 if __name__ == '__main__':
     dataset = fetchDataset(1000)
     tweet_graph, tweet_graph_screenname_mapping = buildGraph(dataset)
     graph_communities_kclique = computeKClique(tweet_graph)
     graph_communities_modularity = computeModularity(tweet_graph)
-    graph_agglomerative_clustering = computeAgglimerativeClustering(tweet_graph, 6)
+    # graph_agglomerative_clustering = computeAgglimerativeClustering(tweet_graph, 6)
+    graph_dbscan_clustering = computeDbscanClustering(tweet_graph, eps=10)
