@@ -4,7 +4,7 @@ import json
 import networkx as nx
 from networkx.algorithms.community import k_clique_communities
 from networkx.algorithms.community import greedy_modularity_communities
-from sklearn.cluster import AgglomerativeClustering
+from sklearn.cluster import AgglomerativeClustering, DBSCAN
 
 def fetchDataset(no_response_to_retrieve=-1):
     '''
