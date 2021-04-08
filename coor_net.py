@@ -5,7 +5,6 @@ import matplotlib.pyplot as plt
 import networkx as nx
 from networkx.algorithms import bipartite
 
-filepath = 'SWM-dataset.csv'
 
 def build_graph(shares_df, coor_shares_df, percentile_edge_weight=90, timestamps=90):
     coord_df = coor_shares_df[['share_date', 'retweet_tid', 'screen_name_from']].reset_index(drop=True)
@@ -28,62 +27,67 @@ def build_graph(shares_df, coor_shares_df, percentile_edge_weight=90, timestamps
     full_graph = bipartite.weighted_projected_graph(bipartite_graph, screen_name_froms)
 
     shares_gb = shares_df.reset_index().groupby(['screen_name_from'])
-    
-    account_info_df = shares_gb['index'].agg([('shares','count')])
-    account_info_df = account_info_df.merge(pd.DataFrame(shares_gb['is_coordinated'].apply(lambda x: (x==True).sum())).rename(columns={'is_coordinated':'coord_shares'}), left_index=True, right_index=True)
-    account_info_df = account_info_df.reset_index().rename(columns={'account_url':'account_url'})
+
+    account_info_df = shares_gb['index'].agg([('shares', 'count')])
+    account_info_df = account_info_df.merge(
+        pd.DataFrame(shares_gb['is_coordinated'].apply(lambda x: (x == True).sum())).rename(
+            columns={'is_coordinated': 'coord_shares'}), left_index=True, right_index=True)
+    account_info_df = account_info_df.reset_index().rename(columns={'screen_name_from': 'screen_name_from'})
 
     # filter the dataframe with the graph nodes
     node_info_df = account_info_df[account_info_df['screen_name_from'].isin(list(full_graph.nodes))]
 
     attributes = []
     for node in full_graph.nodes():
-        records = node_info_df[node_info_df['screen_name_from']==node]
+        records = node_info_df[node_info_df['screen_name_from'] == node]
         attributes.append(node)
         attributes.append({
             'shares': records['shares'].values[0],
             'coord_shares': records['coord_shares'].values[0]
         })
-    
+
     # update graph attributes
     it = iter(attributes)
     nx.set_node_attributes(full_graph, dict(zip(it, it)))
 
     # set the percentile_edge_weight number of repetedly coordinated link sharing to keep
-    q = np.percentile([d['weight'] for (u,v,d) in full_graph.edges(data=True)], percentile_edge_weight)
+    q = np.percentile([d['weight'] for (u, v, d) in full_graph.edges(data=True)], percentile_edge_weight)
 
     # create a new graph where node degree > 0
-    highly_connected_graph = full_graph.subgraph([key for (key,value) in full_graph.degree if value>0]).copy()
+    highly_connected_graph = full_graph.subgraph([key for (key, value) in full_graph.degree if value > 0]).copy()
 
     # remove where the edge weitght is less than the given percentile value
-    edges_to_remove = [(u,v) for (u,v,d) in highly_connected_graph.edges(data=True) if d['weight']<q]
+    edges_to_remove = [(u, v) for (u, v, d) in highly_connected_graph.edges(data=True) if d['weight'] < q]
     highly_connected_graph.remove_edges_from(edges_to_remove)
     highly_connected_graph.remove_nodes_from(list(nx.isolates(highly_connected_graph)))
-    
+
     if timestamps:
         print('Calculating nodes timestamps')
-        vec_func = np.vectorize(lambda u,v: bipartite_graph.get_edge_data(u,v)['share_date'])
+        vec_func = np.vectorize(lambda u, v: bipartite_graph.get_edge_data(u, v)['share_date'])
         attributes = []
-        for (u,v) in highly_connected_graph.edges():
-            attributes.append((u,v))
-            attributes.append({"timestamp_coord_share":vec_func(np.intersect1d(list(list(bipartite_graph.neighbors(u))),list(list(bipartite_graph.neighbors(v)))),u)})
+        for (u, v) in highly_connected_graph.edges():
+            attributes.append((u, v))
+            attributes.append({"timestamp_coord_share": vec_func(
+                np.intersect1d(list(list(bipartite_graph.neighbors(u))), list(list(bipartite_graph.neighbors(v)))), u)})
 
         it = iter(attributes)
         nx.set_edge_attributes(highly_connected_graph, dict(zip(it, it)))
         print("timestamps calculated")
 
     # find and annotate nodes-components
-    connected_components=list(nx.connected_components(highly_connected_graph))
-    components_df = pd.DataFrame({"node": connected_components, "component": [*range(1,len(connected_components)+1)]})
+    connected_components = list(nx.connected_components(highly_connected_graph))
+    components_df = pd.DataFrame(
+        {"node": connected_components, "component": [*range(1, len(connected_components) + 1)]})
     components_df['node'] = components_df['node'].apply(lambda x: list(x))
     components_df = components_df.explode('node')
 
     # add cluster to simplyfy the analysis of large components
-    cluster_df = pd.DataFrame(community_louvain.best_partition(highly_connected_graph).items(), columns=['node', 'cluster'])
+    cluster_df = pd.DataFrame(community_louvain.best_partition(highly_connected_graph).items(),
+                              columns=['node', 'cluster'])
 
     # re-calculate the degree on the graph
     degree_df = pd.DataFrame(list(highly_connected_graph.degree()), columns=['node', 'degree'])
-        
+
     # sum up the edge weights of the adjacent edges for each node
     strength_df = pd.DataFrame(list(highly_connected_graph.degree(weight='weight')), columns=['node', 'strength'])
 
@@ -92,8 +96,9 @@ def build_graph(shares_df, coor_shares_df, percentile_edge_weight=90, timestamps
     # update graph attribues
     nx.set_node_attributes(highly_connected_graph, attributes_df.set_index('node').to_dict('index'))
     print('graph built')
-    
+
     return highly_connected_graph, q
+
 
 def get_estimated_threshold(datarows):
     ''' Estimates a threshold in seconds that defines a coordinated link share. Here threshold is calculated as a function of the median co-share time difference. More specifically, the function ranks all
@@ -109,13 +114,19 @@ def get_estimated_threshold(datarows):
     # filter those retweet_ids from original dataframe
     datarows = datarows[datarows.set_index('retweet_tid').index.isin(orig_df.set_index('retweet_tid').index)]
     # metrics creation
+    # converting object to datetime
     datarows['postedtime'] = datarows['postedtime'].astype('datetime64[ns]')
     ranks_df = datarows[['retweet_tid', 'postedtime']]
     grouped_tweets = datarows.groupby('retweet_tid')
+    # for each retweet id group counting #of unique tid
     ranks_df['tweet_share_count'] = grouped_tweets['tid'].transform('nunique')
+    # get min time in posted timestamp for each grp and assign it as first_share_date
     ranks_df['first_share_date'] = grouped_tweets['postedtime'].transform('min')
+    # Ranking timestamp for each group as they appear
     ranks_df['rank'] = grouped_tweets['postedtime'].rank(ascending=True, method='first')
+    # calculating percentile of shares
     ranks_df['perc_shares'] = ranks_df['rank'] / ranks_df['tweet_share_count']
+
     ranks_df['seconds_from_1st_share'] = (ranks_df['postedtime'] - ranks_df['first_share_date']).dt.total_seconds()
     ranks_df = ranks_df.sort_values(by='retweet_tid')
     # find retweet's with an unusual fast second share and keep the quickest
@@ -126,6 +137,7 @@ def get_estimated_threshold(datarows):
     filter_ranks_df = filter_ranks_df.drop_duplicates()
     filter_ranks_df = filter_ranks_df[
         filter_ranks_df['seconds_from_1st_share'] <= filter_ranks_df['seconds_from_1st_share'].quantile(0.1)]
+
     # filter ranks_df that join with filter_ranks_df
     ranks_df = ranks_df[ranks_df.set_index('retweet_tid').index.isin(filter_ranks_df.set_index('retweet_tid').index)]
     # filter values by 0.5
@@ -136,7 +148,7 @@ def get_estimated_threshold(datarows):
     ranks_sub_df = ranks_sub_df.drop_duplicates()
 
     summary_secs = ranks_sub_df['seconds_from_1st_share'].describe()
-    coordination_interval = ranks_sub_df['seconds_from_1st_share'].quantile(0.5)
+    coordination_interval = ranks_sub_df['seconds_from_1st_share'].quantile(0.1)
     coord_interval = (None, None)
     if coordination_interval == 0:
         coordination_interval = 1
@@ -200,3 +212,16 @@ def coord_shares(datarows):
 
     highly_connected_graph, q = build_graph(shares_df, coor_shares_df)
     return shares_df, highly_connected_graph, q
+
+
+if __name__ == '__main__':
+    filepath = 'SWM-dataset.csv'
+    datarows = pd.read_csv(filepath)
+    datarows = datarows.drop_duplicates()
+    datarows['year'] = datarows['postedtime'].astype('datetime64[ns]').dt.year
+    dt_2016 = datarows[datarows['year'] == 2016]
+    dt_2016.drop(['year'], axis=1)
+    dt_2018 = datarows[datarows['year'] == 2018]
+    dt_2018.drop(['year'], axis=1)
+    shares_df_2016, q_2016, h_c_2016 = coord_shares(dt_2016)
+    shares_df_2018, q_2018, h_c_2018 = coord_shares(dt_2018)
