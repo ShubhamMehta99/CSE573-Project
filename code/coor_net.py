@@ -208,7 +208,6 @@ def coord_shares(datarows):
     shares_df.loc[:, 'is_coordinated'] = shares_df.apply(
         lambda x: True if (x['coord_expanded'] and x['coord_date']) else False, axis=1)
     shares_df.drop(['coord_expanded', 'coord_date'], inplace=True, axis=1)
-    shares_df.to_csv('file_name.csv', encoding='utf-8')
 
     highly_connected_graph, q = build_graph(shares_df, coor_shares_df)
     return shares_df, highly_connected_graph, q
@@ -219,9 +218,10 @@ if __name__ == '__main__':
     datarows = pd.read_csv(filepath)
     datarows = datarows.drop_duplicates()
     datarows['year'] = datarows['postedtime'].astype('datetime64[ns]').dt.year
-    dt_2016 = datarows[datarows['year'] == 2016]
-    dt_2016.drop(['year'], axis=1)
-    dt_2018 = datarows[datarows['year'] == 2018]
-    dt_2018.drop(['year'], axis=1)
-    shares_df_2016, q_2016, h_c_2016 = coord_shares(dt_2016)
-    shares_df_2018, q_2018, h_c_2018 = coord_shares(dt_2018)
+    #call 2018 and 2016 and Ds2 to get intermediate results threshold1 and store the outputs in files.
+    # dt_2016 = datarows[datarows['year'] == 2016]
+    # dt_2016.drop(['year'], axis=1)
+    # dt_2018 = datarows[datarows['year'] == 2018]
+    # dt_2018.drop(['year'], axis=1)
+    # shares_df_2016, q_2016, h_c_2016 = coord_shares(dt_2016)
+    # shares_df_2018, q_2018, h_c_2018 = coord_shares(dt_2018)
