@@ -18,6 +18,9 @@ The **code folder** contains the following:
 ***coor_net.py*** - This file contains code related to calculating Threshold-1(coordination interval) and code to construct highly coordinated graph.  
 
 
+***network_mine.py*** - This file contains code which models the given dataset to community detection algorithms like k-clique and max modularity and clustering algorithms like DBSCAN.
+
+
 ***dataset2_second_threshold_calculation.py*** - This file contains code related to calculating the second threshold in DS-2 and also code for most boosted accounts and most boosted domains.  
 
 
